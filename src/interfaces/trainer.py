@@ -182,6 +182,10 @@ class PathPairwiseTrainer(PairwiseTrainer):
             self.logger.info('training loss in {} epoch: {}'.format(s_epoch+1, sum_loss))
             self.logger.info('training time in {} epoch: {}'.format(s_epoch+1, time.time()-start))
 
+            # saving
+            model_path = os.path.join(self.log_dir, 'model{}.single'.format(s_epoch+1))
+            serializers.save_hdf5(model_path, self.model)
+
         self.logger.info('start path training')
         for epoch in range(self.n_epoch):
             start = time.time()
@@ -210,7 +214,7 @@ class PathPairwiseTrainer(PairwiseTrainer):
             self.logger.info('training time in {} epoch: {}'.format(epoch+1, time.time()-start))
 
             # saving
-            model_path = os.path.join(self.log_dir, 'model{}'.format(epoch+1))
+            model_path = os.path.join(self.log_dir, 'model{}.path'.format(epoch+1))
             serializers.save_hdf5(model_path, self.model)
 
     def _finalize(self):
