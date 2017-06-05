@@ -52,7 +52,7 @@ class Evaluator(object):
             scores = model.cal_scores(subs.astype(np.int32), rels.astype(np.int32))
             res = np.flip(np.argsort(scores), 1)
             ranks = [np.where(order == obj)[0][0] + 1 for order, obj in zip(res, objs)]  # TODO: maybe inefficient
-            sum_rr += sum(rank for rank in ranks)
+            sum_r += sum(rank for rank in ranks)
         return float(sum_r/n_sample)
 
     def cal_path_mr(self, model, dataset):
@@ -62,7 +62,7 @@ class Evaluator(object):
             scores = model.cal_path_scores(np.array(subs).astype(np.int32), np.array(rels).astype(np.int32))
             res = np.flip(np.argsort(scores), 1)
             ranks = [np.where(order == obj)[0][0] + 1 for order, obj in zip(res, objs)]  # TODO: maybe inefficient
-            sum_rr += sum(rank for rank in ranks)
+            sum_r += sum(rank for rank in ranks)
         return float(sum_r/n_sample)
 
     def cal_mrr(self, model, dataset):
