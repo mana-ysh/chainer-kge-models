@@ -4,7 +4,7 @@ from datetime import datetime
 import logging
 import os
 import sys
-from chainer import optimizers
+from chainer import optimizers, optimizer
 
 sys.path.append('../')
 from interfaces.trainer import *
@@ -42,6 +42,8 @@ def train(args):
         args.negative = 1
 
     opt = optimizers.SGD(args.lr)  # TODO: make other optimizers available
+    if args.gradclip > 0:
+        opt.add_hook(optimizer.GradientClipping(args.gradclip))
 
     logger.info('building model...')
     if args.method == 'se':
@@ -141,14 +143,6 @@ def train(args):
     else:
         raise ValueError('Invalid task: {}'.format(args.task))
 
-    # trainer = PairwiseTrainer(model=model, opt=opt, task=args.task,
-    #                           batchsize=args.batch, logger=logger,
-    #                           evaluator=evaluator, valid_dat=valid_dat,
-    #                           n_negative=args.negative, epoch=args.epoch,
-    #                           model_dir=args.log, restart=args.restart)
-    #
-    # trainer.fit(train_dat)
-
 
 if __name__ == '__main__':
     p = argparse.ArgumentParser('Link prediction models')
@@ -169,6 +163,7 @@ if __name__ == '__main__':
     p.add_argument('--epoch', default=100, type=int, help='number of epochs')
     p.add_argument('--batch', default=128, type=int, help='batch size')
     p.add_argument('--lr', default=0.001, type=float, help='learning rate')
+    p.add_argument('--gradclip', default=-1, type=int, help='gradient clipping')
     p.add_argument('--dim', default=100, type=int, help='dimension of embeddings')
     p.add_argument('--margin', default=1., type=float, help='margin in max-margin loss for pairwise training')
     p.add_argument('--negative', default=10, type=int, help='number of negative samples for pairwise training')

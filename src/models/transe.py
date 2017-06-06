@@ -8,6 +8,7 @@ import sys
 import chainer
 from chainer import links as L, Variable, functions as F
 import numpy as np
+from sklearn.preprocessing import normalize
 
 sys.path.append('../')
 from models.base_model import BaseModel
@@ -112,4 +113,4 @@ class TransE(BaseModel, chainer.Chain):
 
     def _normalize(self, ent_set):
         ents = list(ent_set)
-        self.ent_embeds.W.data[ents] /= np.linalg.norm(self.ent_embeds.W.data[ents], axis=1)
+        self.ent_embeds.W.data[ents] = normalize(self.ent_embeds.W.data[ents])
