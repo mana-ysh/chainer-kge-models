@@ -114,7 +114,7 @@ def train(args):
 
     model.save_config(os.path.join(args.log, MODEL_CONFIG_FILE))
 
-    evaluator = Evaluator(args.metric, args.nbest) if args.valid else None
+    evaluator = Evaluator(args.metric, args.nbest, args.gpu_id) if args.valid else None
 
     # preparing data
     if args.task == 'kbc':
