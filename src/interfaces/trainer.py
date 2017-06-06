@@ -129,6 +129,9 @@ class PathPairwiseTrainer(PairwiseTrainer):
         self.logger.info('setup trainer...')
         self.opt.setup(self.model)
 
+        if self.gpu_id > -1:
+            self.model.to_gpu()
+
         # single training
         self.logger.info('start single training')
         for s_epoch in range(self.single_epoch):
