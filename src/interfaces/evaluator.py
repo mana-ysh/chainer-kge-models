@@ -50,6 +50,8 @@ class Evaluator(object):
         sum_r = 0.
         for subs, rels, objs in self.dat_iter(dataset, self.batchsize, rand_flg=False):
             scores = model.cal_scores(self.xp.array(subs, dtype=self.xp.int32), self.xp.array(rels, dtype=self.xp.int32))
+            if self.gpu_id > -1:
+                scores = cuda.to_cpu(scores)
             res = np.flip(np.argsort(scores), 1)
             ranks = [np.where(order == obj)[0][0] + 1 for order, obj in zip(res, objs)]  # TODO: maybe inefficient
             sum_r += sum(rank for rank in ranks)
@@ -60,6 +62,8 @@ class Evaluator(object):
         sum_rr = 0.
         for subs, rels, objs in self.dat_iter(dataset, self.batchsize, rand_flg=False):
             scores = model.cal_scores(self.xp.array(subs, dtype=self.xp.int32), self.xp.array(rels, dtype=self.xp.int32))
+            if self.gpu_id > -1:
+                scores = cuda.to_cpu(scores)
             res = np.flip(np.argsort(scores), 1)
             ranks = [np.where(order == obj)[0][0] + 1 for order, obj in zip(res, objs)]  # TODO: maybe inefficient
             sum_rr += sum(float(1/rank) for rank in ranks)
@@ -70,6 +74,8 @@ class Evaluator(object):
         n_corr = 0
         for subs, rels, objs in self.dat_iter(dataset, self.batchsize, rand_flg=False):
             scores = model.cal_scores(self.xp.array(subs, dtype=self.xp.int32), self.xp.array(rels, dtype=self.xp.int32))
+            if self.gpu_id > -1:
+                scores = cuda.to_cpu(scores)
             res = np.flip(np.argsort(scores), 1)[:, :nbest]
             n_corr += sum(1 for i in range(len(objs)) if objs[i] in res[i])
         return float(n_corr/n_sample)
