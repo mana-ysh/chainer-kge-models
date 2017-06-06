@@ -1,5 +1,5 @@
 
-from chainer import serializers
+from chainer import serializers, cuda
 import copy
 import numpy as np
 import os
@@ -25,11 +25,14 @@ class PairwiseTrainer(object):
         self.valid_dat = kwargs.pop('valid_dat')
         self.n_negative = kwargs.pop('n_negative')
         self.pretrain_model_path = kwargs.pop('restart')
-        # self.task = kwargs.pop('task', 'kbc')
-        # assert self.task in ['kbc', 'pq']
-        # if self.task == 'pq':
-        #     self.single_epoch = kwargs.pop('single')
+        self.gpu_id = kwargs.pop('gpu_id')
         self.model_path = os.path.join(self.log_dir, self.model.__class__.__name__)
+
+        if self.gpu_id > -1:
+            self.xp = cuda.cupy
+            cuda.get_device(self.gpu_id).use()
+        else:
+            self.xp = np
 
         """
         TODO: make other negative sampling methods available. and assuming only objects are corrupted
@@ -39,6 +42,10 @@ class PairwiseTrainer(object):
     def fit(self, samples):
         self.logger.info('setup trainer...')
         self.opt.setup(self.model)
+
+        if self.gpu_id > -1:
+            self.model.to_gpu()
+
         for epoch in range(self.n_epoch):
             start = time.time()
             sum_loss = 0.
@@ -49,10 +56,10 @@ class PairwiseTrainer(object):
                 _batchsize = len(_subs)
                 n_samples = _batchsize * self.n_negative
                 # pos_triples = np.tile(batch, (self.n_negative, 1))
-                neg_objs = self.neg_sampler.sample(n_samples).astype(np.int32)  # assuming only objects are corrupted
-                subs = np.tile(_subs, (self.n_negative)).astype(np.int32)
-                rels = np.tile(_rels, (self.n_negative)).astype(np.int32)
-                pos_objs = np.tile(_objs, (self.n_negative)).astype(np.int32)
+                neg_objs = self.neg_sampler.sample(n_samples).astype(self.xp.int32)  # assuming only objects are corrupted
+                subs = self.xp.tile(_subs, (self.n_negative)).astype(self.xp.int32)
+                rels = self.xp.tile(_rels, (self.n_negative)).astype(self.xp.int32)
+                pos_objs = self.xp.tile(_objs, (self.n_negative)).astype(self.xp.int32)
                 pos_samples = [subs, rels, pos_objs]
                 neg_samples = [subs, rels, neg_objs]
                 loss = self.model(pos_samples, neg_samples)
@@ -66,7 +73,12 @@ class PairwiseTrainer(object):
 
             # saving
             model_path = os.path.join(self.log_dir, 'model{}'.format(epoch+1))
-            serializers.save_hdf5(model_path, self.model)
+            if self.gpu_id > -1:
+                self.model.to_cpu()
+                serializers.save_hdf5(model_path, self.model)
+                self.model.to_gpu()
+            else:
+                serializers.save_hdf5(model_path, self.model)
 
         self._finalize()
 
@@ -99,7 +111,14 @@ class PathPairwiseTrainer(PairwiseTrainer):
         self.n_negative = kwargs.pop('n_negative')
         self.pretrain_model_path = kwargs.pop('restart')
         self.single_epoch = kwargs.pop('single')
+        self.gpu_id = kwargs.pop('gpu_id')
         self.model_path = os.path.join(self.log_dir, self.model.__class__.__name__)
+
+        if self.gpu_id > -1:
+            self.xp = cuda.cupy
+            cuda.get_device(self.gpu_id).use()
+        else:
+            self.xp = np
 
         """
         TODO: make other negative sampling methods available. and assuming only objects are corrupted
@@ -121,11 +140,10 @@ class PathPairwiseTrainer(PairwiseTrainer):
                 # setup for mini-batch training
                 _batchsize = len(_subs)
                 n_samples = _batchsize * self.n_negative
-                # pos_triples = np.tile(batch, (self.n_negative, 1))
-                neg_objs = self.neg_sampler.sample(n_samples).astype(np.int32)  # assuming only objects are corrupted
-                subs = np.tile(_subs, (self.n_negative)).astype(np.int32)
-                rels = np.tile(_rels, (self.n_negative)).astype(np.int32)
-                pos_objs = np.tile(_objs, (self.n_negative)).astype(np.int32)
+                neg_objs = self.xp.array(self.neg_sampler.sample(n_samples), dtype=self.xp.int32)  # assuming only objects are corrupted
+                subs = self.xp.tile(_subs, (self.n_negative)).astype(self.xp.int32)
+                rels = self.xp.tile(_rels, (self.n_negative)).astype(self.xp.int32)
+                pos_objs = self.xp.tile(_objs, (self.n_negative)).astype(self.xp.int32)
                 pos_samples = [subs, rels, pos_objs]
                 neg_samples = [subs, rels, neg_objs]
                 loss = self.model(pos_samples, neg_samples)
@@ -141,7 +159,12 @@ class PathPairwiseTrainer(PairwiseTrainer):
 
             # saving
             model_path = os.path.join(self.log_dir, 'model{}.single'.format(s_epoch+1))
-            serializers.save_hdf5(model_path, self.model)
+            if self.gpu_id > -1:
+                self.model.to_cpu()
+                serializers.save_hdf5(model_path, self.model)
+                self.model.to_gpu()
+            else:
+                serializers.save_hdf5(model_path, self.model)
 
         # path training
         self.logger.info('start path training')
@@ -154,10 +177,10 @@ class PathPairwiseTrainer(PairwiseTrainer):
                 # setup for mini-batch training
                 _batchsize = len(_subs)
                 n_samples = _batchsize * self.n_negative
-                neg_objs = self.neg_sampler.sample(n_samples).astype(np.int32)  # assuming only objects are corrupted
-                subs = np.tile(_subs, (self.n_negative)).astype(np.int32)
-                rels = np.tile(_rels, (self.n_negative, 1)).astype(np.int32)
-                pos_objs = np.tile(_pos_objs, (self.n_negative)).astype(np.int32)
+                neg_objs = self.neg_sampler.sample(n_samples).astype(self.xp.int32)  # assuming only objects are corrupted
+                subs = self.xp.tile(_subs, (self.n_negative)).astype(self.xp.int32)
+                rels = self.xp.tile(_rels, (self.n_negative, 1)).astype(self.xp.int32)
+                pos_objs = self.xp.tile(_pos_objs, (self.n_negative)).astype(self.xp.int32)
                 pos_samples = [subs, rels, pos_objs]
                 neg_samples = [subs, rels, neg_objs]
                 loss = self.model(pos_samples, neg_samples)
@@ -171,7 +194,12 @@ class PathPairwiseTrainer(PairwiseTrainer):
 
             # saving
             model_path = os.path.join(self.log_dir, 'model{}.path'.format(epoch+1))
-            serializers.save_hdf5(model_path, self.model)
+            if self.gpu_id > -1:
+                self.model.to_cpu()
+                serializers.save_hdf5(model_path, self.model)
+                self.model.to_gpu()
+            else:
+                serializers.save_hdf5(model_path, self.model)
 
     def _finalize(self):
         if self.valid_dat:

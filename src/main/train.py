@@ -124,7 +124,8 @@ def train(args):
                                   batchsize=args.batch, logger=logger,
                                   evaluator=evaluator, valid_dat=valid_dat,
                                   n_negative=args.negative, epoch=args.epoch,
-                                  model_dir=args.log, restart=args.restart)
+                                  model_dir=args.log, restart=args.restart,
+                                  gpu_id=args.gpu_id)
         trainer.fit(train_dat)
     elif args.task == 'pq':
         train_pq_dat, train_single_dat = build_path_and_single(args.train, ent_vocab, rel_vocab)
@@ -133,7 +134,8 @@ def train(args):
                                       batchsize=args.batch, logger=logger,
                                       evaluator=evaluator, valid_dat=valid_dat,
                                       n_negative=args.negative, epoch=args.epoch,
-                                      model_dir=args.log, restart=args.restart)
+                                      model_dir=args.log, restart=args.restart,
+                                      gpu_id=args.gpu_id)
 
         trainer.fit(train_single_dat, train_pq_dat)
     else:
@@ -152,7 +154,7 @@ if __name__ == '__main__':
     p = argparse.ArgumentParser('Link prediction models')
     p.add_argument('--mode', default='pairwise', type=str, help='training mode ["pairwise", "single"]')
     p.add_argument('--task', default='kbc', type=str, help='link prediction task ["kbc", "pq"]')
-    p.add_argument('--gpu', default=-1, type=int, help='GPU ID. if using CPU, please set -1')
+    p.add_argument('--gpu_id', default=-1, type=int, help='GPU ID. if using CPU, please set -1')
 
     # dataset
     p.add_argument('--ent', type=str, help='entity list')

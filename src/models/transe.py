@@ -38,7 +38,7 @@ class TransE(BaseModel, chainer.Chain):
 
         if self.unit:
             ent_list = pos_samples[0].tolist() + pos_samples[2].tolist() + neg_samples[0].tolist() + neg_samples[2].tolist()
-            self._normalize(ent_list)
+            self._normalize(set(ent_list))
 
         pos_query = self._traverse(self.ent_embeds(pos_subs), pos_rels)
         neg_query = self._traverse(self.ent_embeds(neg_subs), neg_rels)
@@ -86,9 +86,9 @@ class TransE(BaseModel, chainer.Chain):
             cur_rs = Variable(rels[:, i])
             query = self._traverse(query, cur_rs)
 
-        query = np.expand_dims(query.data, 1)
-        _ent_embeds = np.tile(np.expand_dims(self.ent_embeds.W.data, axis=0), (_batchsize, 1, 1))
-        return - np.sum((query - _ent_embeds)**self.dist, axis=2)
+        query = F.tile(F.expand_dims(query, axis=1), (1, self.n_entity, 1))
+        _ent_embeds = F.tile(F.expand_dims(self.ent_embeds.W, axis=0), (_batchsize, 1, 1))
+        return - F.sum((query - _ent_embeds)**self.dist, axis=2).data
 
     def _traverse(self, query, rels):
         rel_embs = self.rel_embeds(rels)
@@ -104,11 +104,12 @@ class TransE(BaseModel, chainer.Chain):
         _rels = Variable(rels)
 
         if self.unit:
-            self._normalize(subs.tolist())
+            self._normalize(set(subs.tolist()))
 
-        query = np.expand_dims(self._traverse(self.ent_embeds(_subs), _rels).data, 1)
-        _ent_embeds = np.tile(np.expand_dims(self.ent_embeds.W.data, axis=0), (_batchsize, 1, 1))
-        return - np.sum((query - _ent_embeds)**self.dist, axis=2)
+        query = F.tile(F.expand_dims(self._traverse(self.ent_embeds(_subs), _rels), 1), (1, self.n_entity, 1))
+        _ent_embeds = F.tile(F.expand_dims(self.ent_embeds.W, axis=0), (_batchsize, 1, 1))
+        return - F.sum((query - _ent_embeds)**self.dist, axis=2).data
 
-    def _normalize(self, ents):
+    def _normalize(self, ent_set):
+        ents = list(ent_set)
         self.ent_embeds.W.data[ents] /= np.linalg.norm(self.ent_embeds.W.data[ents], axis=1)
