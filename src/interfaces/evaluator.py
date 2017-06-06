@@ -8,6 +8,7 @@ from utils.dataset import batch_iter, PathQueryDataset, TripletDataset, bucket_b
 
 
 BATCHSIZE = 100
+NOGPU = -1
 
 class Evaluator(object):
     def __init__(self, metric, nbest=None, gpu_id=-1):
@@ -18,7 +19,7 @@ class Evaluator(object):
         self.nbest = nbest
         self.batchsize = BATCHSIZE
         self.ress = []
-        self.gpu_id = gpu_id
+        self.gpu_id = NOGPU  # CAUTION: force not to use GPU for evaluation
         if self.gpu_id > -1:
             self.xp = cuda.cupy
         else:

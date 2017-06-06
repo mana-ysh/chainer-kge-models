@@ -155,6 +155,9 @@ class PathPairwiseTrainer(PairwiseTrainer):
                 self.opt.update()
                 sum_loss += loss.data
 
+            if self.gpu_id > -1:
+                self.model.to_cpu()
+
             self.model.init_reverse()  # initialize latent representations of reverse relations
             self.validation()
             self.logger.info('training loss in {} epoch: {}'.format(s_epoch+1, sum_loss))
@@ -162,12 +165,10 @@ class PathPairwiseTrainer(PairwiseTrainer):
 
             # saving
             model_path = os.path.join(self.log_dir, 'model{}.single'.format(s_epoch+1))
+            serializers.save_hdf5(model_path, self.model)
+
             if self.gpu_id > -1:
-                self.model.to_cpu()
-                serializers.save_hdf5(model_path, self.model)
                 self.model.to_gpu()
-            else:
-                serializers.save_hdf5(model_path, self.model)
 
         # path training
         self.logger.info('start path training')
@@ -191,23 +192,20 @@ class PathPairwiseTrainer(PairwiseTrainer):
                 loss.backward()
                 self.opt.update()
                 sum_loss += loss.data
+
+            if self.gpu_id > -1:
+                self.model.to_cpu()
+
             self.validation()
             self.logger.info('training loss in {} epoch: {}'.format(epoch+1, sum_loss))
             self.logger.info('training time in {} epoch: {}'.format(epoch+1, time.time()-start))
 
             # saving
             model_path = os.path.join(self.log_dir, 'model{}.path'.format(epoch+1))
-            if self.gpu_id > -1:
-                self.model.to_cpu()
-                serializers.save_hdf5(model_path, self.model)
-                self.model.to_gpu()
-            else:
-                serializers.save_hdf5(model_path, self.model)
+            serializers.save_hdf5(model_path, self.model)
 
-    def _finalize(self):
-        if self.valid_dat:
-            best_epoch, best_val = self.evaluator.get_best_info()
-            self.logger.info('===== Best metric: {} ({} epoch) ====='.format(best_val, best_epoch))
+            if self.gpu_id > -1:
+                self.model.to_gpu()
 
 
 class UniformIntSampler(object):
