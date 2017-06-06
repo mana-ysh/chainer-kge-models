@@ -12,17 +12,6 @@ from utils.dataset import batch_iter, bucket_batch_iter
 np.random.seed(46)
 
 
-class Trainer(object):
-    def __init__(self):
-        pass
-
-    def _setup(self):
-        pass
-
-    def fit(self):
-        pass
-
-
 class PairwiseTrainer(object):
     def __init__(self, model, opt, **kwargs):
         self.model = model
@@ -90,38 +79,6 @@ class PairwiseTrainer(object):
         else:
             pass
 
-    def _kbc_fit(self, samples):
-        self.logger.info('setup trainer...')
-        self.opt.setup(self.model)
-        for epoch in range(self.n_epoch):
-            start = time.time()
-            sum_loss = 0.
-            self.logger.info('start {} epoch'.format(epoch+1))
-            self.epoch = epoch
-            for _subs, _rels, _objs in batch_iter(samples, self.batchsize):
-                # setup for mini-batch training
-                _batchsize = len(_subs)
-                n_samples = _batchsize * self.n_negative
-                # pos_triples = np.tile(batch, (self.n_negative, 1))
-                neg_objs = self.neg_sampler.sample(n_samples).astype(np.int32)  # assuming only objects are corrupted
-                subs = np.tile(_subs, (self.n_negative)).astype(np.int32)
-                rels = np.tile(_rels, (self.n_negative)).astype(np.int32)
-                pos_objs = np.tile(_objs, (self.n_negative)).astype(np.int32)
-                pos_samples = [subs, rels, pos_objs]
-                neg_samples = [subs, rels, neg_objs]
-                loss = self.model(pos_samples, neg_samples)
-                self.model.zerograds()
-                loss.backward()
-                self.opt.update()
-                sum_loss += loss.data
-            self.validation()
-            self.logger.info('training loss in {} epoch: {}'.format(epoch+1, sum_loss))
-            self.logger.info('training time in {} epoch: {}'.format(epoch+1, time.time()-start))
-
-            # saving
-            model_path = os.path.join(self.log_dir, 'model{}'.format(epoch+1))
-            serializers.save_hdf5(model_path, self.model)
-
     def _finalize(self):
         if self.valid_dat:
             best_epoch, best_val = self.evaluator.get_best_info()
@@ -153,6 +110,7 @@ class PathPairwiseTrainer(PairwiseTrainer):
         self.logger.info('setup trainer...')
         self.opt.setup(self.model)
 
+        # single training
         self.logger.info('start single training')
         for s_epoch in range(self.single_epoch):
             start = time.time()
@@ -176,8 +134,7 @@ class PathPairwiseTrainer(PairwiseTrainer):
                 self.opt.update()
                 sum_loss += loss.data
 
-            self.model.init_reverse()
-
+            self.model.init_reverse()  # initialize latent representations of reverse relations
             self.validation()
             self.logger.info('training loss in {} epoch: {}'.format(s_epoch+1, sum_loss))
             self.logger.info('training time in {} epoch: {}'.format(s_epoch+1, time.time()-start))
@@ -186,6 +143,7 @@ class PathPairwiseTrainer(PairwiseTrainer):
             model_path = os.path.join(self.log_dir, 'model{}.single'.format(s_epoch+1))
             serializers.save_hdf5(model_path, self.model)
 
+        # path training
         self.logger.info('start path training')
         for epoch in range(self.n_epoch):
             start = time.time()
@@ -194,8 +152,6 @@ class PathPairwiseTrainer(PairwiseTrainer):
             self.epoch = epoch
             for (_subs, _rels, _pos_objs) in bucket_batch_iter(path_samples, self.batchsize):
                 # setup for mini-batch training
-                assert len(_subs) == len(_rels)
-                assert len(_rels) == len(_pos_objs)
                 _batchsize = len(_subs)
                 n_samples = _batchsize * self.n_negative
                 neg_objs = self.neg_sampler.sample(n_samples).astype(np.int32)  # assuming only objects are corrupted
@@ -204,7 +160,7 @@ class PathPairwiseTrainer(PairwiseTrainer):
                 pos_objs = np.tile(_pos_objs, (self.n_negative)).astype(np.int32)
                 pos_samples = [subs, rels, pos_objs]
                 neg_samples = [subs, rels, neg_objs]
-                loss = self.model._path_forward(pos_samples, neg_samples)
+                loss = self.model(pos_samples, neg_samples)
                 self.model.zerograds()
                 loss.backward()
                 self.opt.update()
@@ -223,22 +179,6 @@ class PathPairwiseTrainer(PairwiseTrainer):
             self.logger.info('===== Best metric: {} ({} epoch) ====='.format(best_val, best_epoch))
 
 
-class SingleTrainer(object):
-    def __init__(self, model, opt, sess, **kwargs):
-        self.model = model
-        self.n_entity = model.n_entity
-        self.opt = opt
-        self.sess = sess
-        self.n_epoch = kwargs.pop('epoch')
-        self.batchsize = kwargs.pop('batchsize')
-        self.logger = kwargs.pop('logger')
-        self.log_dir = kwargs.pop('model_dir')
-        self.evaluator = kwargs.pop('evaluator')
-        self.valid_dat = kwargs.pop('valid_dat')
-        self.model_path = os.path.join(self.log_dir, self.model.__class__.__name__)
-        raise NotImplementedError
-
-
 class UniformIntSampler(object):
     def __init__(self, lower, upper):
         self.lower = lower
@@ -253,7 +193,7 @@ class DebugPairwiseTrainer(PairwiseTrainer):
         super(DebugPairwiseTrainer, self).__init__(**kwargs)
         self.n_negative = 1
 
-    def _kbc_fit(self, samples):
+    def fit(self, samples):
         self.logger.info('setup trainer...')
         self.opt.setup(self.model)
         for epoch in range(self.n_epoch):

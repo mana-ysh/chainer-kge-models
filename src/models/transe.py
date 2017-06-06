@@ -28,7 +28,7 @@ class TransE(BaseModel, chainer.Chain):
         )
 
 
-    def __call__(self, pos_samples, neg_samples):
+    def _single_forward(self, pos_samples, neg_samples):
         pos_subs = Variable(pos_samples[0])
         pos_rels = Variable(pos_samples[1])
         pos_objs = Variable(pos_samples[2])
@@ -40,8 +40,8 @@ class TransE(BaseModel, chainer.Chain):
             ent_list = pos_samples[0].tolist() + pos_samples[2].tolist() + neg_samples[0].tolist() + neg_samples[2].tolist()
             self._normalize(ent_list)
 
-        pos_query = self._composite(pos_subs, pos_rels)
-        neg_query = self._composite(neg_subs, neg_rels)
+        pos_query = self._traverse(self.ent_embeds(pos_subs), pos_rels)
+        neg_query = self._traverse(self.ent_embeds(neg_subs), neg_rels)
 
         pos_score = self._cal_similarity(pos_query, pos_objs)
         neg_score = self._cal_similarity(neg_query, neg_objs)
@@ -78,7 +78,7 @@ class TransE(BaseModel, chainer.Chain):
 
         return F.sum(F.relu(1 - (pos_score - neg_score)))
 
-    def cal_path_scores(self, subs, rels):
+    def _path_scores(self, subs, rels):
         query = self.ent_embeds(Variable(subs))
         _batchsize, n_rel = rels.shape
 
@@ -90,11 +90,6 @@ class TransE(BaseModel, chainer.Chain):
         _ent_embeds = np.tile(np.expand_dims(self.ent_embeds.W.data, axis=0), (_batchsize, 1, 1))
         return - np.sum((query - _ent_embeds)**self.dist, axis=2)
 
-    def _composite(self, subs, rels):
-        sub_embed = self.ent_embeds(subs)
-        rel_embed = self.rel_embeds(rels)
-        return sub_embed + rel_embed
-
     def _traverse(self, query, rels):
         rel_embs = self.rel_embeds(rels)
         return query + rel_embs
@@ -103,7 +98,7 @@ class TransE(BaseModel, chainer.Chain):
         obj_embed = self.ent_embeds(objs)
         return - F.sum((query - obj_embed)**self.dist, axis=1)
 
-    def cal_scores(self, subs, rels):
+    def _single_scores(self, subs, rels):
         _batchsize = len(subs)
         _subs = Variable(subs)
         _rels = Variable(rels)
@@ -111,10 +106,9 @@ class TransE(BaseModel, chainer.Chain):
         if self.unit:
             self._normalize(subs.tolist())
 
-        query = np.expand_dims(self._composite(_subs, _rels).data, 1)
+        query = np.expand_dims(self._traverse(self.ent_embeds(_subs), _rels).data, 1)
         _ent_embeds = np.tile(np.expand_dims(self.ent_embeds.W.data, axis=0), (_batchsize, 1, 1))
         return - np.sum((query - _ent_embeds)**self.dist, axis=2)
 
     def _normalize(self, ents):
-        embs = self.ent_embeds.W.data[ents]
-        embs /= np.linalg.norm(embs, axis=1)
+        self.ent_embeds.W.data[ents] /= np.linalg.norm(self.ent_embeds.W.data[ents], axis=1)

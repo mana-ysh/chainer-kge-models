@@ -100,6 +100,7 @@ class Vocab(object):
 
 
 def batch_iter(dataset, batchsize, rand_flg=True):
+    assert isinstance(dataset, TripletDataset)
     n_sample = len(dataset)
     idxs = np.random.permutation(n_sample) if rand_flg else np.arange(n_sample)
     for start_idx in range(0, n_sample, batchsize):
@@ -109,6 +110,7 @@ def batch_iter(dataset, batchsize, rand_flg=True):
 
 # for PathQueryDataset
 def bucket_batch_iter(dataset, batchsize, rand_flg=True):
+    assert isinstance(dataset, PathQueryDataset)
     n_r_dist = [0 for _ in range(MAX_NUM_REL)]
     n_r2idx = {i: [] for i in range(MAX_NUM_REL)}
     for i, pq_item in enumerate(dataset.samples):  # TODO: inefficient
@@ -131,16 +133,10 @@ def bucket_batch_iter(dataset, batchsize, rand_flg=True):
         subs = [item.s for item in _data]  # TODO: maybe inefficient
         rels = [item.rs for item in _data]
         objs = [item.o for item in _data]
-        yield subs, rels, objs
+        yield np.array(subs), np.array(rels), np.array(objs)
 
         n_r_dist[i-1] -= len(idxs)
         n_r2idx[i-1] = n_r2idx[i-1][batchsize:]
-
-
-
-def single_batch_iter(dataset, batchsize, rand_flg=True):
-    raise NotImplementedError
-
 
 def build_path_and_single(data_path, ent_vocab, rel_vocab):
     pq_dat = PathQueryDataset.load(data_path, ent_vocab, rel_vocab)
