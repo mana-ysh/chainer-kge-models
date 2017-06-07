@@ -9,7 +9,7 @@ import sys
 sys.path.append('../')
 from interfaces.trainer import PairwiseTrainer
 from interfaces.evaluator import Evaluator
-from utils.dataset import TripletDataset, Vocab
+from utils.dataset import TripletDataset, Vocab, PathQueryDataset
 
 
 def test(args):
