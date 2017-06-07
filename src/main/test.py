@@ -17,15 +17,7 @@ def test(args):
     ent_vocab = Vocab.load(args.ent)
     rel_vocab = Vocab.load(args.rel)
 
-    # preparing data
-    if args.task == 'kbc':
-        test_dat = TripletDataset.load(args.data, ent_vocab, rel_vocab)
-    elif args.task == 'pq':
-        raise NotImplementedError
-    else:
-        raise ValueError('Invalid task: {}'.format(args.task))
-
-        print('building model...')
+    print('building model...')
     if args.method == 'se':
         from models.structurede import StructuredE as Model
     elif args.method == 'transe':
@@ -49,7 +41,21 @@ def test(args):
 
     model = Model.instantiate_model(args.model)
     serializers.load_hdf5(args.model, model)
+
+    # preparing data
+    print('preparing data...')
+    if args.task == 'kbc':
+        test_dat = TripletDataset.load(args.data, ent_vocab, rel_vocab)
+    elif args.task == 'pq':
+        test_dat = PathQueryDataset.load(args.data, ent_vocab, rel_vocab)
+        if args.init_reverse:
+            print('initialize reverse relations...')
+            model.init_reverse()
+    else:
+        raise ValueError('Invalid task: {}'.format(args.task))
+
     evaluator = Evaluator(args.metric, args.nbest)
+    print('evaluating...')
     res = evaluator.run(model, test_dat)
 
     if args.metric == 'mrr':
@@ -76,6 +82,8 @@ if __name__ == '__main__':
     p.add_argument('--method', default='se', type=str,
                    help='method ["se", "transe", "bi", "bid", "bhole", "fhole", "bitri", "compe", "qe"]')
     p.add_argument('--model', type=str, help='trained model path')
+    p.add_argument('--init_reverse', action='store_true',
+                   help='initialize latent representations of reverse relations')
 
     # evaluation
     p.add_argument('--metric', default='mrr', type=str, help='evaluation metrics ["mrr", "hits", "mr"]')
